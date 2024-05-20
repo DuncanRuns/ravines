@@ -1,6 +1,7 @@
 #include "ravines.h"
 
 #include "rng.h" //rng.h from cubiomes
+#include <math.h>
 
 #define PI 3.14159265358979323846
 
