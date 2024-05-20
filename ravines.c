@@ -1,25 +1,8 @@
-// This code is public domain
-// https://creativecommons.org/public-domain/cc0/
+#include "ravines.h"
 
-// Created by DuncanRuns
-
-#include "finders.h"
-#include <stdio.h>
-#include <stdint.h>
+#include "rng.h" //rng.h from cubiomes
 
 #define PI 3.14159265358979323846
-
-typedef struct
-{
-    uint64_t rand;
-    uint8_t canSpawn;
-    int xGuess, zGuess;
-    int upperY, lowerY;
-    float yaw, pitch;
-    int ravineLength;
-    double verticalRadiusAtCenter;
-    double x, y, z;
-} RavineGenerator;
 
 void initCarverSeed(uint64_t *rand, uint64_t worldSeed, int chunkX, int chunkZ)
 {
@@ -27,17 +10,6 @@ void initCarverSeed(uint64_t *rand, uint64_t worldSeed, int chunkX, int chunkZ)
     setSeed(rand, ((uint64_t)chunkX) * nextLong(rand) ^ ((uint64_t)chunkZ) * nextLong(rand) ^ worldSeed);
 }
 
-/**
- * Initializes a ravine generator.
- * <br>
- * This will create a RavineGenerator with starting parameters and some approximations. To get accurate values, use simulateRavineToMiddle afterwards.
- * <br>
- * The returned struct has the following characteristics:
- * <li> canSpawn == 1 if the ravine can spawn; any of the following values are invalid if canSpawn == 0 </li>
- * <li> yaw, pitch, x, y, and z are initialized to the start of the ravine (these changes over iteration of ravine drawing) </li>
- * <li> ravineLength and verticalRadiusAtCenter are calculated and are accurate</li>
- * <li> xGuess, zGuess, upperY, and lowerY are approximate guesses of the middle of the ravine based on other starting parameters </li>
- */
 RavineGenerator initRavine(uint64_t worldSeed, int chunkX, int chunkZ)
 {
     RavineGenerator gen;
@@ -67,15 +39,6 @@ RavineGenerator initRavine(uint64_t worldSeed, int chunkX, int chunkZ)
     return gen;
 }
 
-/**
- * Simulates half of a ravine using a RavineGenerator made from initRavine.
- * <br>
- * The returned struct has the following characteristics:
- * <li> canSpawn is unchanged and should have been checked before </li>
- * <li> xGuess, zGuess, ravineLength and verticalRadiusAtCenter are also unchanged </li>
- * <li> yaw, pitch, x, y, and z represent coordinates (and direction of the ravine) at the center of the ravine </li>
- * <li> upperY and lowerY are set to the y level bounds of the center of the ravine (full bounds may not be reached, allow a few extra blocks if lava is required) </li>
- */
 void simulateRavineToMiddle(RavineGenerator *gen)
 {
     uint64_t *rand = &gen->rand;
@@ -123,71 +86,5 @@ void simulateRavineToMiddle(RavineGenerator *gen)
     if (gen->upperY > 248)
     {
         gen->upperY = 248;
-    }
-}
-
-// Test functions below, do not include in project
-
-void generateSomeRavines()
-{
-    int totalFound = 0;
-    for (uint64_t worldSeed = 0; worldSeed < (1 << 16); worldSeed++)
-    {
-        RavineGenerator r = initRavine(worldSeed, 0, 0);
-        if (r.canSpawn)
-        {
-            int startX = (int)r.x;
-            int startY = (int)r.y;
-            int startZ = (int)r.z;
-            int gx = r.xGuess, gz = r.zGuess;
-            int lowerGuess = r.lowerY;
-            int upperGuess = r.upperY;
-            simulateRavineToMiddle(&r);
-            if (r.lowerY < 8 && r.upperY >= 41)
-            {
-                printf("%lld: start=(%d %d %d), guess=(%d %d->%d %d), middle=(%d %d %d), middleRange=(%d,%d)\n",
-                       worldSeed,
-                       startX, startY, startZ,
-                       gx, lowerGuess, upperGuess, gz,
-                       (int)r.x, (int)r.y, (int)r.z,
-                       r.lowerY, r.upperY);
-                if (++totalFound == 10)
-                {
-                    return;
-                }
-            }
-        }
-    }
-}
-
-void findSeedsWithMagmaRavines()
-{
-    Generator g;
-    setupGenerator(&g, MC_1_16_1, 0);
-    int totalFound = 0;
-    for (uint64_t lower48 = 0; lower48 < (1 << 16); lower48++)
-    {
-        RavineGenerator r = initRavine(lower48, 0, 0);
-        if (r.canSpawn)
-        {
-            simulateRavineToMiddle(&r);
-            if (r.lowerY > 7 || r.upperY < 42)
-                continue;
-            for (uint64_t upper16 = 0; upper16 < 300; upper16++)
-            {
-                uint64_t worldSeed = (upper16 << 48) | lower48;
-                applySeed(&g, DIM_OVERWORLD, worldSeed);
-                int i = getBiomeAt(&g, 4, r.x / 4, r.y / 4, r.z / 4);
-                if (isDeepOcean(i))
-                {
-                    printf("%lld: %d %d %d\n", worldSeed, (int)r.x, (int)r.y, (int)r.z);
-                    if (++totalFound == 100)
-                    {
-                        return;
-                    }
-                    break;
-                }
-            }
-        }
     }
 }
